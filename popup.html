@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 350px;
+      min-height: 400px;
+      padding: 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin: 0;
+    }
+    
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    h1 {
+      text-align: center;
+      margin: 0 0 20px 0;
+      font-size: 24px;
+      font-weight: 300;
+    }
+    
+    .bookmark-info {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .bookmark-title {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 8px;
+      word-wrap: break-word;
+    }
+    
+    .bookmark-url {
+      font-size: 12px;
+      opacity: 0.8;
+      word-wrap: break-word;
+    }
+    
+    .config-section {
+      margin-bottom: 20px;
+    }
+    
+    .config-section h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 14px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+    
+    input[type="text"]::placeholder, input[type="password"]::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    input[type="text"]:focus, input[type="password"]:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 10px;
+    }
+    
+    button:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .success {
+      background: rgba(76, 175, 80, 0.3);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+      color: #4CAF50;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+    
+    .error {
+      background: rgba(244, 67, 54, 0.3);
+      border: 1px solid rgba(244, 67, 54, 0.5);
+      color: #F44336;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+    
+    .toggle-config {
+      font-size: 12px;
+      text-decoration: underline;
+      cursor: pointer;
+      opacity: 0.8;
+      text-align: center;
+      display: block;
+      margin-bottom: 15px;
+    }
+    
+    .config-form {
+      display: none;
+    }
+    
+    .config-form.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📚 Bookmark Sync</h1>
+    
+    <div id="current-page" class="bookmark-info">
+      <div class="bookmark-title" id="page-title">Loading...</div>
+      <div class="bookmark-url" id="page-url">Loading...</div>
+    </div>
+    
+    <div id="message"></div>
+    
+    <button id="save-bookmark">Save to S3</button>
+    
+    <span class="toggle-config" id="toggle-config">⚙️ Configure AWS Settings</span>
+    
+    <div id="config-form" class="config-form">
+      <div class="config-section">
+        <h3>AWS Configuration</h3>
+        <input type="text" id="aws-region" placeholder="AWS Region (e.g., us-east-1)">
+        <input type="text" id="aws-access-key" placeholder="AWS Access Key ID">
+        <input type="password" id="aws-secret-key" placeholder="AWS Secret Access Key">
+        <input type="text" id="s3-bucket" placeholder="S3 Bucket Name">
+        <button id="save-config">Save Configuration</button>
+      </div>
+    </div>
+    
+    <button id="view-bookmarks">View Saved Bookmarks</button>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html> 
