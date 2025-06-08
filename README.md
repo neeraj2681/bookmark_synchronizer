@@ -186,4 +186,8 @@ This project is open source. Feel free to modify and distribute as needed.
 
 ---
 
+The basic version of extension will look something like this:
+<img src = 'bookmark_sync_extension_v1.png'>the prototype!</img>
+
+
 **Note**: Remember to create the required icon files before loading the extension in Chrome. The extension will not work without the icon files specified in the manifest. 
