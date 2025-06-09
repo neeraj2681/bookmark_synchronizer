@@ -22,3 +22,4 @@ Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.in
 🔗 Health check: http://localhost:3000/health
 Executing (default): SELECT "id", "email", "password_hash", "is_active", "last_login", "created_at", "updated_at" FROM "users" AS "User" WHERE "User"."id" = 1;
 Executing (default): SELECT "id", "email", "password_hash", "is_active", "last_login", "created_at", "updated_at" FROM "users" AS "User" WHERE "User"."id" = 1;
+📴 SIGTERM received, shutting down gracefully
