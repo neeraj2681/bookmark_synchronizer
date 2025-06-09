@@ -505,16 +505,13 @@ Web-based interface for browsing, searching, and managing synchronized bookmarks
             "Action": [
                 "s3:GetObject",
                 "s3:PutObject",
-                "s3:DeleteObject"
-            ],
-            "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
+                "s3:DeleteObject",
                 "s3:ListBucket"
             ],
-            "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME"
+            "Resource": [
+                "arn:aws:s3:::YOUR-BUCKET-NAME",
+                "arn:aws:s3:::YOUR-BUCKET-NAME/*"
+            ]
         }
     ]
 }
@@ -604,3 +601,31 @@ Web-based interface for browsing, searching, and managing synchronized bookmarks
 ---
 
 *This document is proprietary and confidential. Distribution is restricted to authorized personnel only.* 
+
+┌─────────────────────────────────────────────────────────────┐
+│                    USER INTERACTIONS                        │
+├─────────────────────┬─────────────────────┬─────────────────┤
+│   Left-Click Icon   │  Right-Click Menu   │   Bookmark UI   │
+│   (Save Bookmark)   │   (Settings/View)   │   (Search/Browse)│
+└─────────────────────┴─────────────────────┴─────────────────┘
+           │                      │                      │
+           ▼                      ▼                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 CHROME EXTENSION LAYER                      │
+├─────────────────────┬─────────────────────┬─────────────────┤
+│   Background.js     │    Popup.html/js    │  Bookmarks.html │
+│   (Service Worker)  │   (Configuration)   │   (Viewer/CSV)  │
+│   • Event Handler   │   • AWS Setup       │   • Search UI   │
+│   • S3 Operations   │   • Credential Mgmt │   • Export Tools│
+│   • Badge Updates   │   • Validation      │   • Filtering   │
+└─────────────────────┴─────────────────────┴─────────────────┘
+           │                      │                      │
+           ▼                      ▼                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   STORAGE LAYER                             │
+├─────────────────────┬─────────────────────┬─────────────────┤
+│   Chrome Storage    │      AWS S3         │   Local Backup  │
+│   • Credentials     │   • JSON Files      │   • Recent 100  │
+│   • Configuration   │   • /bookmarks/     │   • Offline     │
+│   • User Prefs      │   • Timestamped     │   • Recovery    │
+└─────────────────────┴─────────────────────┴─────────────────┘ 
