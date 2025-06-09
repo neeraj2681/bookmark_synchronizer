@@ -1,206 +1,409 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Bookmark Synchronizer - Saved Bookmarks</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-    
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 20px;
-      padding: 30px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    }
-    
-    h1 {
-      text-align: center;
-      color: #333;
-      margin-bottom: 30px;
-      font-size: 2.5em;
-      font-weight: 300;
-    }
-    
-    .search-box {
-      width: 100%;
-      padding: 15px 20px;
-      border: 2px solid #ddd;
-      border-radius: 50px;
-      font-size: 16px;
-      margin-bottom: 30px;
-      background: white;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-    
-    .search-box:focus {
-      outline: none;
-      border-color: #667eea;
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
-    }
-    
-    .loading {
-      text-align: center;
-      padding: 50px;
-      color: #666;
-      font-size: 18px;
-    }
-    
-    .error {
-      text-align: center;
-      padding: 50px;
-      color: #f44336;
-      font-size: 18px;
-    }
-    
-    .bookmarks-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-    }
-    
-    .bookmark-card {
-      background: white;
-      border-radius: 15px;
-      padding: 20px;
-      border: 1px solid #eee;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-    
-    .bookmark-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    }
-    
-    .bookmark-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 10px;
-      line-height: 1.4;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    
-    .bookmark-url {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 10px;
-      word-break: break-all;
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    
-    .bookmark-date {
-      color: #999;
-      font-size: 12px;
-      margin-bottom: 10px;
-    }
-    
-    .bookmark-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-    
-    .tag {
-      background: #e3f2fd;
-      color: #1976d2;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 500;
-    }
-    
-    .stats {
-      text-align: center;
-      margin-bottom: 20px;
-      color: #666;
-      font-size: 14px;
-    }
-    
-    .refresh-btn {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: #667eea;
-      color: white;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      transition: all 0.3s ease;
-    }
-    
-    .refresh-btn:hover {
-      background: #5a67d8;
-      transform: scale(1.1);
-    }
-    
-    .no-bookmarks {
-      text-align: center;
-      padding: 100px 20px;
-      color: #666;
-    }
-    
-    .no-bookmarks h2 {
-      font-size: 24px;
-      margin-bottom: 10px;
-      color: #999;
-    }
-    
-    .no-bookmarks p {
-      font-size: 16px;
-      line-height: 1.6;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookmarks - Bookmark Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            min-height: calc(100vh - 40px);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 300px;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: linear-gradient(45deg, #ff6b6b, #ffa726);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .bookmarks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .bookmark-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            border-left: 4px solid #667eea;
+        }
+
+        .bookmark-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .bookmark-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .bookmark-favicon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .bookmark-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2d3748;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .bookmark-url {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            word-break: break-all;
+            line-height: 1.3;
+        }
+
+        .bookmark-url:hover {
+            text-decoration: underline;
+        }
+
+        .bookmark-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .bookmark-date {
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .bookmark-tags {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .bookmark-tag {
+            background: #edf2f7;
+            color: #4a5568;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .auth-required {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .auth-required .title {
+            color: #e53e3e;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-bar {
+                flex-direction: column;
+            }
+
+            .search-input {
+                min-width: unset;
+            }
+
+            .bookmarks-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                justify-content: center;
+            }
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: #4a5568;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #f7fafc;
+            border-color: #667eea;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .current-page {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>📚 Saved Bookmarks</h1>
-    
-    <input type="text" class="search-box" id="search-box" placeholder="🔍 Search bookmarks...">
-    
-    <div class="stats" id="stats"></div>
-    
-    <div id="loading" class="loading">
-      Loading your bookmarks...
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="title">📖 My Bookmarks</h1>
+            <div class="user-info">
+                <span id="user-email">Loading...</span>
+                <button class="btn btn-secondary" id="export-btn">
+                    📥 Export CSV
+                </button>
+                <button class="btn btn-secondary" id="refresh-btn">
+                    🔄 Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Auth Required State -->
+        <div id="auth-required" class="auth-required" style="display: none;">
+            <h2 class="title">🔐 Authentication Required</h2>
+            <p>Please login to view your bookmarks.</p>
+            <br>
+            <button class="btn btn-primary" onclick="window.close()">
+                Go to Login
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content">
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <input type="text" id="search-input" class="search-input" 
+                       placeholder="🔍 Search bookmarks by title, URL, or tags...">
+                <button class="btn btn-primary" id="search-btn">Search</button>
+                <button class="btn btn-secondary" id="clear-search">Clear</button>
+            </div>
+
+            <!-- Statistics -->
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat-card">
+                    <span class="stat-number" id="total-bookmarks">0</span>
+                    <span class="stat-label">Total Bookmarks</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="shown-bookmarks">0</span>
+                    <span class="stat-label">Shown</span>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="error-message" class="error" style="display: none;"></div>
+
+            <!-- Loading State -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading your bookmarks...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state" style="display: none;">
+                <div class="empty-icon">📝</div>
+                <h3>No bookmarks found</h3>
+                <p>Start saving bookmarks by clicking the extension icon on any webpage!</p>
+            </div>
+
+            <!-- Bookmarks Grid -->
+            <div id="bookmarks-grid" class="bookmarks-grid"></div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="pagination" style="display: none;">
+                <button id="prev-page">← Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page">Next →</button>
+            </div>
+        </div>
     </div>
-    
-    <div id="error" class="error" style="display: none;"></div>
-    
-    <div id="bookmarks-container" class="bookmarks-grid" style="display: none;"></div>
-    
-    <div id="no-bookmarks" class="no-bookmarks" style="display: none;">
-      <h2>No bookmarks found</h2>
-      <p>Start saving bookmarks by clicking on the extension icon while browsing!</p>
-    </div>
-  </div>
-  
-  <button class="refresh-btn" id="refresh-btn" title="Refresh">🔄</button>
-  
-  <script src="bookmarks.js"></script>
+
+    <script src="bookmarks.js"></script>
 </body>
 </html> 
