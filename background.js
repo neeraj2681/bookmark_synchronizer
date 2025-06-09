@@ -1,11 +1,11 @@
-// Background service worker for Chrome extension
+// Background service worker for Chrome extension with API authentication
 console.log('Background script loaded');
 
 // Create context menu when extension installs
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: "openSettings",
-    title: "⚙️ Configure AWS Settings",
+    id: "openAuth",
+    title: "🔐 Login / Sign Up",
     contexts: ["action"]
   });
   
@@ -14,18 +14,26 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "📖 View Bookmarks",
     contexts: ["action"]
   });
+
+  chrome.contextMenus.create({
+    id: "logout",
+    title: "🚪 Logout",
+    contexts: ["action"]
+  });
 });
 
 // Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "openSettings") {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === "openAuth") {
     chrome.tabs.create({
-      url: chrome.runtime.getURL('popup.html')
+      url: chrome.runtime.getURL('auth.html')
     });
   } else if (info.menuItemId === "viewBookmarks") {
     chrome.tabs.create({
       url: chrome.runtime.getURL('bookmarks.html')
     });
+  } else if (info.menuItemId === "logout") {
+    await handleLogout();
   }
 });
 
@@ -51,30 +59,28 @@ async function autoSaveBookmark(tab) {
       return;
     }
     
-    // Get AWS configuration
-    const config = await chrome.storage.sync.get([
-      'awsRegion', 'awsAccessKey', 'awsSecretKey', 's3Bucket'
+    // Check authentication
+    const authData = await chrome.storage.sync.get([
+      'accessToken', 'userEmail', 'apiServer'
     ]);
     
-    // Check if configuration exists
-    if (!config.awsRegion || !config.awsAccessKey || !config.awsSecretKey || !config.s3Bucket) {
-      // Show badge to indicate config needed
+    if (!authData.accessToken || !authData.userEmail || !authData.apiServer) {
+      // Show badge to indicate auth needed
       chrome.action.setBadgeText({ text: '!', tabId: tab.id });
       chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
       
-      // Clear badge after 3 seconds
       setTimeout(() => {
         chrome.action.setBadgeText({ text: '', tabId: tab.id });
       }, 3000);
       
-      console.log('AWS configuration not found - right-click extension icon to configure');
+      console.log('Authentication required - right-click extension icon to login');
       
       // Show notification
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icons/icon48.png',
         title: 'Bookmark Sync',
-        message: 'Right-click the extension icon to configure AWS settings'
+        message: 'Please login first. Right-click the extension icon to authenticate.'
       });
       
       return;
@@ -88,14 +94,13 @@ async function autoSaveBookmark(tab) {
     const bookmark = {
       title: tab.title || 'Untitled',
       url: tab.url,
-      timestamp: new Date().toISOString(),
       favicon: tab.favIconUrl || ''
     };
     
     console.log('Saving bookmark:', bookmark);
     
-    // Save bookmark
-    const result = await handleSaveBookmark(bookmark, config);
+    // Save bookmark via API
+    const result = await saveBookmarkToAPI(bookmark, authData);
     
     if (result.success) {
       // Show success badge
@@ -114,7 +119,7 @@ async function autoSaveBookmark(tab) {
         type: 'basic',
         iconUrl: 'icons/icon48.png',
         title: 'Bookmark Saved!',
-        message: `"${bookmark.title}" saved to S3`
+        message: `"${bookmark.title}" saved successfully`
       });
       
     } else {
@@ -158,249 +163,279 @@ async function autoSaveBookmark(tab) {
   }
 }
 
-// Listen for messages from popup
+// Save bookmark to API
+async function saveBookmarkToAPI(bookmark, authData) {
+  try {
+    const response = await fetch(`${authData.apiServer}/api/bookmarks/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authData.accessToken}`
+      },
+      body: JSON.stringify(bookmark)
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Save to local storage as backup
+      await saveToLocalStorage(data.bookmark);
+      return { success: true, data };
+    } else {
+      // Handle token expiration
+      if (response.status === 401) {
+        const refreshResult = await refreshAccessToken(authData);
+        if (refreshResult.success) {
+          // Retry with new token
+          return await saveBookmarkToAPI(bookmark, {
+            ...authData,
+            accessToken: refreshResult.accessToken
+          });
+        } else {
+          return { success: false, error: 'Authentication expired. Please login again.' };
+        }
+      }
+      
+      return { success: false, error: data.error || 'Failed to save bookmark' };
+    }
+
+  } catch (error) {
+    console.error('API error:', error);
+    return { success: false, error: 'Network error. Please check your connection.' };
+  }
+}
+
+// Refresh access token
+async function refreshAccessToken(authData) {
+  try {
+    const response = await fetch(`${authData.apiServer}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refreshToken: authData.refreshToken
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Update stored tokens
+      await chrome.storage.sync.set({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken || authData.refreshToken
+      });
+      
+      return { success: true, accessToken: data.accessToken };
+    } else {
+      // Refresh failed, user needs to login again
+      await handleLogout();
+      return { success: false, error: 'Session expired' };
+    }
+
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    return { success: false, error: 'Failed to refresh token' };
+  }
+}
+
+// Handle logout
+async function handleLogout() {
+  try {
+    // Get current auth data
+    const authData = await chrome.storage.sync.get(['accessToken', 'apiServer']);
+    
+    // Call logout API if we have a token
+    if (authData.accessToken && authData.apiServer) {
+      try {
+        await fetch(`${authData.apiServer}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authData.accessToken}`
+          }
+        });
+      } catch (error) {
+        console.error('Logout API error:', error);
+        // Continue with local logout even if API call fails
+      }
+    }
+    
+    // Clear stored auth data
+    await chrome.storage.sync.remove([
+      'accessToken', 'refreshToken', 'userEmail'
+    ]);
+    
+    // Show logout notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'Logged Out',
+      message: 'You have been logged out successfully'
+    });
+    
+    console.log('User logged out');
+    
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+}
+
+// Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'saveBookmark') {
-    handleSaveBookmark(request.bookmark, request.config)
+    handleSaveBookmarkMessage(request)
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep message channel open for async response
   }
   
   if (request.action === 'getBookmarks') {
-    handleGetBookmarks(request.config)
+    handleGetBookmarksMessage(request)
       .then(result => sendResponse(result))
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep message channel open for async response
   }
+
+  if (request.action === 'exportBookmarks') {
+    handleExportBookmarksMessage(request)
+      .then(result => sendResponse(result))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === 'checkAuth') {
+    handleCheckAuth()
+      .then(result => sendResponse(result))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 });
 
-// Handle saving bookmark to S3
-async function handleSaveBookmark(bookmark, config) {
+// Handle save bookmark message
+async function handleSaveBookmarkMessage(request) {
+  const authData = await chrome.storage.sync.get([
+    'accessToken', 'userEmail', 'apiServer'
+  ]);
+  
+  if (!authData.accessToken) {
+    return { success: false, error: 'Not authenticated' };
+  }
+  
+  return await saveBookmarkToAPI(request.bookmark, authData);
+}
+
+// Handle get bookmarks message
+async function handleGetBookmarksMessage(request) {
   try {
-    const fileName = `bookmarks/${Date.now()}-${sanitizeFileName(bookmark.title)}.json`;
+    const authData = await chrome.storage.sync.get([
+      'accessToken', 'userEmail', 'apiServer'
+    ]);
     
-    const bookmarkData = {
-      title: bookmark.title,
-      url: bookmark.url,
-      timestamp: bookmark.timestamp,
-      favicon: bookmark.favicon,
-      tags: extractTags(bookmark.title, bookmark.url)
+    if (!authData.accessToken) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const { limit = 50, offset = 0, search } = request;
+    let endpoint = `${authData.apiServer}/api/bookmarks/list?limit=${limit}&offset=${offset}`;
+    
+    if (search) {
+      endpoint = `${authData.apiServer}/api/bookmarks/search?q=${encodeURIComponent(search)}&limit=${limit}`;
+    }
+
+    const response = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${authData.accessToken}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      return { success: true, data };
+    } else {
+      if (response.status === 401) {
+        const refreshResult = await refreshAccessToken(authData);
+        if (refreshResult.success) {
+          // Retry with new token
+          return await handleGetBookmarksMessage(request);
+        }
+      }
+      return { success: false, error: data.error || 'Failed to fetch bookmarks' };
+    }
+
+  } catch (error) {
+    console.error('Get bookmarks error:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+// Handle export bookmarks message
+async function handleExportBookmarksMessage(request) {
+  try {
+    const authData = await chrome.storage.sync.get([
+      'accessToken', 'userEmail', 'apiServer'
+    ]);
+    
+    if (!authData.accessToken) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const response = await fetch(`${authData.apiServer}/api/bookmarks/export/csv`, {
+      headers: {
+        'Authorization': `Bearer ${authData.accessToken}`
+      }
+    });
+
+    if (response.ok) {
+      const csvData = await response.text();
+      return { success: true, csvData };
+    } else {
+      const data = await response.json();
+      return { success: false, error: data.error || 'Export failed' };
+    }
+
+  } catch (error) {
+    console.error('Export error:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+// Handle check authentication
+async function handleCheckAuth() {
+  try {
+    const authData = await chrome.storage.sync.get([
+      'accessToken', 'userEmail', 'apiServer'
+    ]);
+    
+    return {
+      success: true,
+      authenticated: !!(authData.accessToken && authData.userEmail),
+      userEmail: authData.userEmail
     };
-    
-    const success = await uploadToS3(
-      config.s3Bucket,
-      fileName,
-      JSON.stringify(bookmarkData, null, 2),
-      config
-    );
-    
-    if (success) {
-      // Also save to local storage as backup
-      await saveToLocalStorage(bookmarkData);
-      return { success: true };
-    } else {
-      throw new Error('Failed to upload to S3');
-    }
   } catch (error) {
-    console.error('Error saving bookmark:', error);
     return { success: false, error: error.message };
   }
-}
-
-// Handle getting bookmarks from S3
-async function handleGetBookmarks(config) {
-  try {
-    const bookmarks = await listS3Objects(config.s3Bucket, 'bookmarks/', config);
-    return { success: true, bookmarks: bookmarks };
-  } catch (error) {
-    console.error('Error getting bookmarks:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Upload file to S3
-async function uploadToS3(bucket, key, body, config) {
-  try {
-    const url = `https://${bucket}.s3.${config.awsRegion}.amazonaws.com/${key}`;
-    const timestamp = new Date().toISOString();
-    
-    const headers = await generateS3Headers('PUT', bucket, key, config, body, timestamp);
-    
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: headers,
-      body: body
-    });
-    
-    if (response.ok) {
-      console.log(`Successfully uploaded ${key} to S3`);
-      return true;
-    } else {
-      const errorText = await response.text();
-      console.error('S3 upload failed:', response.status, errorText);
-      throw new Error(`S3 upload failed: ${response.status} ${errorText}`);
-    }
-  } catch (error) {
-    console.error('Error uploading to S3:', error);
-    throw error;
-  }
-}
-
-// List S3 objects
-async function listS3Objects(bucket, prefix, config) {
-  try {
-    const url = `https://${bucket}.s3.${config.awsRegion}.amazonaws.com/?list-type=2&prefix=${prefix}`;
-    const timestamp = new Date().toISOString();
-    
-    const headers = await generateS3Headers('GET', bucket, '', config, '', timestamp);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: headers
-    });
-    
-    if (response.ok) {
-      const xmlText = await response.text();
-      return parseS3ListResponse(xmlText);
-    } else {
-      throw new Error(`Failed to list S3 objects: ${response.status}`);
-    }
-  } catch (error) {
-    console.error('Error listing S3 objects:', error);
-    throw error;
-  }
-}
-
-// Generate S3 authentication headers
-async function generateS3Headers(method, bucket, key, config, body, timestamp) {
-  const date = timestamp.split('T')[0].replace(/-/g, '');
-  const region = config.awsRegion;
-  const service = 's3';
-  
-  // Create canonical request
-  const canonicalUri = key ? `/${key}` : '/';
-  const canonicalQueryString = method === 'GET' && !key ? 'list-type=2&prefix=bookmarks/' : '';
-  const canonicalHeaders = `host:${bucket}.s3.${region}.amazonaws.com\nx-amz-content-sha256:${await sha256(body)}\nx-amz-date:${timestamp.replace(/[-:]/g, '').split('.')[0]}Z\n`;
-  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
-  
-  const canonicalRequest = `${method}\n${canonicalUri}\n${canonicalQueryString}\n${canonicalHeaders}\n${signedHeaders}\n${await sha256(body)}`;
-  
-  // Create string to sign
-  const algorithm = 'AWS4-HMAC-SHA256';
-  const credentialScope = `${date}/${region}/${service}/aws4_request`;
-  const stringToSign = `${algorithm}\n${timestamp.replace(/[-:]/g, '').split('.')[0]}Z\n${credentialScope}\n${await sha256(canonicalRequest)}`;
-  
-  // Calculate signature
-  const signingKey = await getSignatureKey(config.awsSecretKey, date, region, service);
-  const signature = await hmacSha256(signingKey, stringToSign);
-  
-  // Create authorization header
-  const authorization = `${algorithm} Credential=${config.awsAccessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  
-  return {
-    'Authorization': authorization,
-    'X-Amz-Content-Sha256': await sha256(body),
-    'X-Amz-Date': timestamp.replace(/[-:]/g, '').split('.')[0] + 'Z',
-    'Content-Type': 'application/json'
-  };
-}
-
-// Utility functions for AWS signature generation
-async function sha256(message) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function hmacSha256(key, message) {
-  const encoder = new TextEncoder();
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    key,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(message));
-  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function getSignatureKey(key, dateStamp, regionName, serviceName) {
-  const encoder = new TextEncoder();
-  const kDate = await hmacSha256(encoder.encode('AWS4' + key), dateStamp);
-  const kRegion = await hmacSha256(new Uint8Array(kDate.match(/.{2}/g).map(h => parseInt(h, 16))), regionName);
-  const kService = await hmacSha256(new Uint8Array(kRegion.match(/.{2}/g).map(h => parseInt(h, 16))), serviceName);
-  const kSigning = await hmacSha256(new Uint8Array(kService.match(/.{2}/g).map(h => parseInt(h, 16))), 'aws4_request');
-  return new Uint8Array(kSigning.match(/.{2}/g).map(h => parseInt(h, 16)));
-}
-
-// Parse S3 list response XML
-function parseS3ListResponse(xmlText) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlText, 'text/xml');
-  const contents = doc.getElementsByTagName('Contents');
-  
-  const objects = [];
-  for (let i = 0; i < contents.length; i++) {
-    const keyElement = contents[i].getElementsByTagName('Key')[0];
-    const lastModifiedElement = contents[i].getElementsByTagName('LastModified')[0];
-    const sizeElement = contents[i].getElementsByTagName('Size')[0];
-    
-    if (keyElement) {
-      objects.push({
-        key: keyElement.textContent,
-        lastModified: lastModifiedElement ? lastModifiedElement.textContent : '',
-        size: sizeElement ? sizeElement.textContent : '0'
-      });
-    }
-  }
-  
-  return objects;
 }
 
 // Save to local storage as backup
 async function saveToLocalStorage(bookmark) {
   try {
-    const result = await chrome.storage.local.get(['bookmarks']);
-    const bookmarks = result.bookmarks || [];
-    bookmarks.push(bookmark);
+    const result = await chrome.storage.local.get(['localBookmarks']);
+    const localBookmarks = result.localBookmarks || [];
     
-    // Keep only last 100 bookmarks in local storage
-    if (bookmarks.length > 100) {
-      bookmarks.splice(0, bookmarks.length - 100);
+    // Add new bookmark to the beginning
+    localBookmarks.unshift(bookmark);
+    
+    // Keep only last 100 bookmarks locally
+    if (localBookmarks.length > 100) {
+      localBookmarks.splice(100);
     }
     
-    await chrome.storage.local.set({ bookmarks: bookmarks });
+    await chrome.storage.local.set({ localBookmarks });
+    console.log('Bookmark saved to local storage');
+    
   } catch (error) {
     console.error('Error saving to local storage:', error);
   }
-}
-
-// Utility functions
-function sanitizeFileName(title) {
-  return title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '-').toLowerCase().substring(0, 50);
-}
-
-function extractTags(title, url) {
-  const tags = [];
-  
-  // Extract domain
-  try {
-    const domain = new URL(url).hostname.replace('www.', '');
-    tags.push(domain);
-  } catch (e) {
-    console.error('Error extracting domain:', e);
-  }
-  
-  // Extract common keywords from title
-  const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an'];
-  const words = title.toLowerCase().split(/\s+/).filter(word => 
-    word.length > 3 && !commonWords.includes(word)
-  );
-  
-  tags.push(...words.slice(0, 5)); // Take first 5 relevant words
-  
-  return [...new Set(tags)]; // Remove duplicates
 } 
