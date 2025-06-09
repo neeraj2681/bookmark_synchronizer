@@ -157,8 +157,8 @@ REFRESH_TOKEN_EXPIRES_IN=7d
 
 # AWS Configuration
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
+AWS_ACCESS_KEY_ID=your-aws-access-key-id-here
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key-here
 S3_BUCKET_NAME=bookmark-sync-bucket-unique-name
 
 # Server Configuration
