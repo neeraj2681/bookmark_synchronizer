@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await getCurrentTab();
   await loadConfiguration();
   setupEventListeners();
+  checkConfigurationStatus();
 });
 
 // Get current active tab
@@ -38,9 +39,28 @@ async function loadConfiguration() {
   }
 }
 
+// Check configuration status and show appropriate message
+async function checkConfigurationStatus() {
+  try {
+    const config = await chrome.storage.sync.get([
+      'awsRegion', 'awsAccessKey', 'awsSecretKey', 's3Bucket'
+    ]);
+    
+    if (!config.awsRegion || !config.awsAccessKey || !config.awsSecretKey || !config.s3Bucket) {
+      showMessage('⚙️ Please configure AWS settings below to enable one-click saving', 'error');
+      document.getElementById('config-form').classList.add('show');
+      document.getElementById('toggle-config').textContent = '🔼 Hide Configuration';
+    } else {
+      showMessage('✅ One-click saving is ready! Just click the extension icon on any page', 'success');
+    }
+  } catch (error) {
+    console.error('Error checking configuration:', error);
+  }
+}
+
 // Setup event listeners
 function setupEventListeners() {
-  document.getElementById('save-bookmark').addEventListener('click', saveBookmark);
+  document.getElementById('manual-save').addEventListener('click', manualSaveBookmark);
   document.getElementById('save-config').addEventListener('click', saveConfiguration);
   document.getElementById('toggle-config').addEventListener('click', toggleConfigForm);
   document.getElementById('view-bookmarks').addEventListener('click', viewBookmarks);
@@ -77,20 +97,20 @@ async function saveConfiguration() {
   
   try {
     await chrome.storage.sync.set(config);
-    showMessage('Configuration saved successfully!', 'success');
+    showMessage('✅ Configuration saved! One-click saving is now active', 'success');
     
     // Hide config form after saving
     setTimeout(() => {
       toggleConfigForm();
-    }, 1500);
+    }, 2000);
   } catch (error) {
     console.error('Error saving configuration:', error);
     showMessage('Error saving configuration', 'error');
   }
 }
 
-// Save bookmark to S3
-async function saveBookmark() {
+// Manual save bookmark (same as one-click, but triggered from popup)
+async function manualSaveBookmark() {
   if (!currentTab) {
     showMessage('No active tab found', 'error');
     return;
@@ -104,12 +124,13 @@ async function saveBookmark() {
   if (!config.awsRegion || !config.awsAccessKey || !config.awsSecretKey || !config.s3Bucket) {
     showMessage('Please configure AWS settings first', 'error');
     document.getElementById('config-form').classList.add('show');
+    document.getElementById('toggle-config').textContent = '🔼 Hide Configuration';
     return;
   }
   
-  const saveButton = document.getElementById('save-bookmark');
+  const saveButton = document.getElementById('manual-save');
   saveButton.disabled = true;
-  saveButton.textContent = 'Saving...';
+  saveButton.textContent = '💾 Saving...';
   
   try {
     const bookmark = {
@@ -127,16 +148,16 @@ async function saveBookmark() {
     });
     
     if (response.success) {
-      showMessage('Bookmark saved successfully!', 'success');
+      showMessage('✅ Bookmark saved successfully!', 'success');
     } else {
-      showMessage(`Error: ${response.error}`, 'error');
+      showMessage(`❌ Error: ${response.error}`, 'error');
     }
   } catch (error) {
     console.error('Error saving bookmark:', error);
-    showMessage('Error saving bookmark', 'error');
+    showMessage('❌ Error saving bookmark', 'error');
   } finally {
     saveButton.disabled = false;
-    saveButton.textContent = 'Save to S3';
+    saveButton.textContent = '💾 Save This Page Now';
   }
 }
 
@@ -149,6 +170,8 @@ async function viewBookmarks() {
     
     if (!config.s3Bucket) {
       showMessage('Please configure AWS settings first', 'error');
+      document.getElementById('config-form').classList.add('show');
+      document.getElementById('toggle-config').textContent = '🔼 Hide Configuration';
       return;
     }
     
@@ -164,11 +187,11 @@ async function viewBookmarks() {
         url: chrome.runtime.getURL('bookmarks.html')
       });
     } else {
-      showMessage(`Error loading bookmarks: ${response.error}`, 'error');
+      showMessage(`❌ Error loading bookmarks: ${response.error}`, 'error');
     }
   } catch (error) {
     console.error('Error loading bookmarks:', error);
-    showMessage('Error loading bookmarks', 'error');
+    showMessage('❌ Error loading bookmarks', 'error');
   }
 }
 
@@ -178,9 +201,9 @@ function showMessage(text, type) {
   messageDiv.textContent = text;
   messageDiv.className = type;
   
-  // Clear message after 3 seconds
+  // Clear message after 5 seconds
   setTimeout(() => {
     messageDiv.textContent = '';
     messageDiv.className = '';
-  }, 3000);
+  }, 5000);
 } 

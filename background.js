@@ -1,6 +1,163 @@
 // Background service worker for Chrome extension
 console.log('Background script loaded');
 
+// Create context menu when extension installs
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "openSettings",
+    title: "⚙️ Configure AWS Settings",
+    contexts: ["action"]
+  });
+  
+  chrome.contextMenus.create({
+    id: "viewBookmarks", 
+    title: "📖 View Bookmarks",
+    contexts: ["action"]
+  });
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "openSettings") {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('popup.html')
+    });
+  } else if (info.menuItemId === "viewBookmarks") {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('bookmarks.html')
+    });
+  }
+});
+
+// Listen for extension icon clicks - ONE CLICK SAVE
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log('Extension icon clicked, auto-saving bookmark for:', tab.url);
+  await autoSaveBookmark(tab);
+});
+
+// Auto-save bookmark when extension icon is clicked
+async function autoSaveBookmark(tab) {
+  try {
+    // Skip non-http(s) pages
+    if (!tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) {
+      chrome.action.setBadgeText({ text: '!', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#ff9800' });
+      
+      setTimeout(() => {
+        chrome.action.setBadgeText({ text: '', tabId: tab.id });
+      }, 3000);
+      
+      console.log('Cannot bookmark this page type:', tab.url);
+      return;
+    }
+    
+    // Get AWS configuration
+    const config = await chrome.storage.sync.get([
+      'awsRegion', 'awsAccessKey', 'awsSecretKey', 's3Bucket'
+    ]);
+    
+    // Check if configuration exists
+    if (!config.awsRegion || !config.awsAccessKey || !config.awsSecretKey || !config.s3Bucket) {
+      // Show badge to indicate config needed
+      chrome.action.setBadgeText({ text: '!', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
+      
+      // Clear badge after 3 seconds
+      setTimeout(() => {
+        chrome.action.setBadgeText({ text: '', tabId: tab.id });
+      }, 3000);
+      
+      console.log('AWS configuration not found - right-click extension icon to configure');
+      
+      // Show notification
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon48.png',
+        title: 'Bookmark Sync',
+        message: 'Right-click the extension icon to configure AWS settings'
+      });
+      
+      return;
+    }
+    
+    // Show saving indicator
+    chrome.action.setBadgeText({ text: '⏳', tabId: tab.id });
+    chrome.action.setBadgeBackgroundColor({ color: '#2196F3' });
+    
+    // Create bookmark object
+    const bookmark = {
+      title: tab.title || 'Untitled',
+      url: tab.url,
+      timestamp: new Date().toISOString(),
+      favicon: tab.favIconUrl || ''
+    };
+    
+    console.log('Saving bookmark:', bookmark);
+    
+    // Save bookmark
+    const result = await handleSaveBookmark(bookmark, config);
+    
+    if (result.success) {
+      // Show success badge
+      chrome.action.setBadgeText({ text: '✓', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+      
+      // Clear badge after 2 seconds
+      setTimeout(() => {
+        chrome.action.setBadgeText({ text: '', tabId: tab.id });
+      }, 2000);
+      
+      console.log('Bookmark saved successfully');
+      
+      // Show success notification
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon48.png',
+        title: 'Bookmark Saved!',
+        message: `"${bookmark.title}" saved to S3`
+      });
+      
+    } else {
+      // Show error badge
+      chrome.action.setBadgeText({ text: '✗', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#f44336' });
+      
+      // Clear badge after 3 seconds
+      setTimeout(() => {
+        chrome.action.setBadgeText({ text: '', tabId: tab.id });
+      }, 3000);
+      
+      console.error('Failed to save bookmark:', result.error);
+      
+      // Show error notification
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon48.png',
+        title: 'Save Failed',
+        message: `Error: ${result.error}`
+      });
+    }
+  } catch (error) {
+    console.error('Error in auto-save:', error);
+    
+    // Show error badge
+    chrome.action.setBadgeText({ text: '✗', tabId: tab.id });
+    chrome.action.setBadgeBackgroundColor({ color: '#f44336' });
+    
+    setTimeout(() => {
+      chrome.action.setBadgeText({ text: '', tabId: tab.id });
+    }, 3000);
+    
+    // Show error notification
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'Save Failed',
+      message: 'An unexpected error occurred'
+    });
+  }
+}
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'saveBookmark') {

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <style>
     body {
-      width: 350px;
-      min-height: 400px;
+      width: 320px;
+      min-height: 350px;
       padding: 20px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -26,6 +26,46 @@
       margin: 0 0 20px 0;
       font-size: 24px;
       font-weight: 300;
+    }
+    
+    .info-section {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      text-align: center;
+    }
+    
+    .one-click-info {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    
+    .one-click-desc {
+      font-size: 14px;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+    
+    .status-indicators {
+      display: flex;
+      justify-content: space-around;
+      margin: 15px 0;
+      font-size: 12px;
+    }
+    
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 0.8;
+    }
+    
+    .status-icon {
+      font-size: 18px;
+      margin-bottom: 4px;
     }
     
     .bookmark-info {
@@ -147,11 +187,41 @@
     .config-form.show {
       display: block;
     }
+    
+    .quick-action-btn {
+      background: rgba(76, 175, 80, 0.3);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+      color: #4CAF50;
+    }
+    
+    .quick-action-btn:hover {
+      background: rgba(76, 175, 80, 0.4);
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>📚 Bookmark Sync</h1>
+    
+    <div class="info-section">
+      <div class="one-click-info">🎯 One-Click Saving Active!</div>
+      <div class="one-click-desc">Just click the extension icon to instantly save any page to S3</div>
+      
+      <div class="status-indicators">
+        <div class="status-item">
+          <div class="status-icon">✓</div>
+          <div>Success</div>
+        </div>
+        <div class="status-item">
+          <div class="status-icon">!</div>
+          <div>Config Needed</div>
+        </div>
+        <div class="status-item">
+          <div class="status-icon">✗</div>
+          <div>Error</div>
+        </div>
+      </div>
+    </div>
     
     <div id="current-page" class="bookmark-info">
       <div class="bookmark-title" id="page-title">Loading...</div>
@@ -160,7 +230,8 @@
     
     <div id="message"></div>
     
-    <button id="save-bookmark">Save to S3</button>
+    <button id="manual-save" class="quick-action-btn">💾 Save This Page Now</button>
+    <button id="view-bookmarks" class="quick-action-btn">📖 View All Bookmarks</button>
     
     <span class="toggle-config" id="toggle-config">⚙️ Configure AWS Settings</span>
     
@@ -174,8 +245,6 @@
         <button id="save-config">Save Configuration</button>
       </div>
     </div>
-    
-    <button id="view-bookmarks">View Saved Bookmarks</button>
   </div>
   
   <script src="popup.js"></script>
